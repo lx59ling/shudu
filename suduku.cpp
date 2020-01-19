@@ -9,8 +9,9 @@
 
 using namespace std;
 
-int* result[1000005];   //用于存放指向 存放数独终局数据数组 的指针
-int solve_map[81][81];  //用于存放求解数独时的数独问题
+int result[100000000];   //用于存放指向 存放数独终局数据数组 的指针
+char write_type[99999999];	//用于提前存好数独终局的格式，减少写入文件的时间
+int solve_map[1000005][81];  //用于存放求解数独时的数独问题
 
 class sudo
 {
@@ -18,21 +19,19 @@ private:
 	int sudo_map[9][9];
 	int count;
 	int num;
-	bool solve;
 public:
 	sudo() {};
 	sudo(int n)
 	{
 		count = 0;
 		num = n;
-		solve = false;
 
 	}
 	void creat_End();
 	void write_to_file();
 	
-	void solve_Que(int count);
-	bool is_right(int count);
+	void solve_Que(int count,int que_num);
+	bool is_right(int count, int que_num);
 };
 
 void sudo::creat_End()
@@ -67,17 +66,14 @@ void sudo::creat_End()
 
 					}
 
-					//将产生的矩阵存好
-					int* new_sudo_map = (int *)malloc(81 * sizeof(int));
-
-					for (int k = 0; k < 9; k++)   //为第一行赋值
-						new_sudo_map[k] = first_line[k];
+					//将产生的矩阵存入result数组中
+					for (int k = 0; k < 9; k++)
+						result[k + 81 * this->count] = first_line[k];   //存第一行数据						
 
 					for (int i = 1; i < 9; i++)
 						for (int j = 0; j < 9; j++)
-							new_sudo_map[i * 9 + j] = this->sudo_map[row[i-1]][j];  //将数独终局存入一个一维数组中，方便存入数组result中
+							result[i * 9 + j + 81*this->count] = this->sudo_map[row[i-1]][j];  //将数独终局存入一个一维数组中,便于输出
 
-					result[this->count] = new_sudo_map;
 					this->count++;
 
 					if (this->count == this->num)   //终局数达到要求了
@@ -95,7 +91,7 @@ void sudo::creat_End()
 }
 
 
-bool sudo::is_right(int count)		//判断填入数据的合法性
+bool sudo::is_right(int count, int que_num)		//判断填入数据的合法性
 {
 	int row = count / 9;	//当前空所在行
 	int col = count % 9;	//当前空所在列
@@ -103,7 +99,7 @@ bool sudo::is_right(int count)		//判断填入数据的合法性
 
 	for (k = 0; k < 9; k++)		//判断填入的数在该行是否出现过
 	{
-		if (solve_map[row][k] == solve_map[row][col] && k != col)
+		if (solve_map[que_num][row * 9 + k] == solve_map[que_num][count] && k != col)
 		{
 			return false;
 		}
@@ -111,7 +107,7 @@ bool sudo::is_right(int count)		//判断填入数据的合法性
 	
 	for (k = 0; k < 9; k++)		//判断填入的数在该列是否出现过
 	{
-		if (solve_map[k][col] == solve_map[row][col] && k != row)
+		if (solve_map[que_num][col * 9 + k] == solve_map[que_num][count] && k != row)
 		{
 			return false;
 		}
@@ -120,12 +116,13 @@ bool sudo::is_right(int count)		//判断填入数据的合法性
 	//判断填入的数在3*3的块区内是否出现过
 	int part_row = row / 3 * 3;
 	int part_col = col / 3 * 3;
-	for (k = part_row; k < part_row + 3; k++)
+
+	for (int j = part_row; j < part_row + 3; j++)
 	{
 		for (int k = part_col; k < part_col + 3; k++)
 
 		{
-			if (solve_map[k][k] == solve_map[row][col] && k != row && k != col)
+			if (solve_map[que_num][j * 9 + k] == solve_map[que_num][count] && j != row && k != col)
 			{
 				return false;
 			}
@@ -138,18 +135,15 @@ bool sudo::is_right(int count)		//判断填入数据的合法性
 
 int op = 0;   //用于表示solv_map里是否有空格0，若无则置1表示数独问题解决完毕
 
-void sudo::solve_Que(int count)
+void sudo::solve_Que(int count,int que_num)
 {
 	//如果81个数字均有合法的填入，说明数独问题解决完毕，打印结果至文件
 	if (count == 81 && op ==1)
 	{
-		int* new_sudo_map = (int *)malloc(81 * sizeof(int));
+		for (int i = 0; i < 81; i++)
+				result[i + 81* que_num] = solve_map[que_num][i];  //将解得的数独终局存入一个一维数组中
 
-		for (int i = 0; i < 9; i++)
-			for (int j = 0; j < 9; j++)
-				new_sudo_map[i * 9 + j] = solve_map[i][j];  //将解得的数独终局存入一个一维数组中，方便存入数组result中
-
-		result[this->num] = new_sudo_map;
+		que_num++;
 		this->num++;    
 
 		return;
@@ -159,38 +153,64 @@ void sudo::solve_Que(int count)
 	int col = count % 9;	//当前空所在列
 
 	//如果该位置为0，即需要进行求解
-	if (solve_map[row][col] == 0)
+	if (solve_map[que_num][count] == '0')
 	{
 		op = 0;
 		for (int i = 1; i <= 9; i++)
 		{
-			solve_map[row][col] = i;	//将1-9填入该空位
+			solve_map[que_num][count] = i;	//将1-9填入该空位
 
-			if (is_right(count))	 //判断该数是否合法
+			if (is_right(count,que_num))	 //判断该数是否合法
 			{
 				op = 1;
-				solve_Que(count + 1);	//如果合法，则对下一个0位置进行操作
+				solve_Que(count + 1,que_num);	//如果合法，则对下一个0位置进行操作
 			}
 		}
 
 		//如果该位置始终没找到合适的数字，或者dfs到某一层没有找到一个合适的数字，则重新置0等待回溯
-		solve_map[row][col] = 0;
+		solve_map[que_num][count] = 0;
 		op = 0;
 	}
 
 	//如果该位置不为0，则直接对下个位置进行操作
 	else
 	{
-		solve_Que(count + 1);
+		solve_Que(count + 1,que_num);
 	}
 
 }
 
 void sudo::write_to_file()
 {
+	int t = 0;
+	for (int k = 0; k < this->num; k++)
+	{
+		for (int j = 0; j < 81; j++)
+		{
+			write_type[t] = result[81 * k + j] + '0';
+			t++;
+
+			if (j % 9 == 8)
+			{
+				write_type[t] = '\n';   
+				t++;
+				continue;
+			}
+
+			write_type[t] = ' ';
+			t++;
+		}
+
+		if (k < this->num - 1)
+		{
+			write_type[t] = '\n';
+			t++;
+		}
+	}
+
 	ofstream fp;
 
-	fp.open("sudoku.txt",ios::app);
+	fp.open("sudoku.txt", ios::app);
 	
 	if (!fp) 
 	{
@@ -198,33 +218,20 @@ void sudo::write_to_file()
 		return ;
 	}
 
-	for (int i = 0; i < this->num; i++)
+	int i = 0;
+	while (write_type[i]!='\0')
 	{
-		for (int j = 0; j < 81; j++)
-		{
-			fp << *(result[i]+j);
-			
-			if (j % 9 == 8)
-			{
-				fp << endl;
-				continue;
-			}
-
-			fp << " ";
-		}
-
-		if(i < this->num -1)
-		fp << endl;
-
+		fp << write_type[i];
+		i++;
 	}
+	cout << "work" << endl;
 
-	fp.close();
 }
 
 int main(int argc, char const *argv[])
 {
 	/*		//测试用例
-	sudo sudo1(100000);
+	sudo sudo1(1000000);
 
 	sudo1.creat_End();
 	sudo1.write_to_file();
@@ -277,28 +284,32 @@ int main(int argc, char const *argv[])
 		}
 
 		sudo sudo2;
-		int t1;
-		int*p = &solve_map[0][0];
 
-		int n;
-		fi >> n;   // 
+		char buff[1024];                                     // 1Kb的缓冲区
+		int t = 0, que_num = 0;
 
-		for (int i = 0; i < n; i++)
+		while (fi.getline(buff, 1024))                     // 按行读取文件到缓冲区
 		{
-			p = &solve_map[0][0];   //每一个数独问题都从头开始赋值给solve_map
-			int word_num = 0;
-
-			while ((fi >> t1) &&(word_num < 81) )             //每次读取文件中的一个数独问题(每81个数字结束循环)
+			for (int i = 0; i < 1024; i++)
 			{
-				*p = t1;
-				p++;
-				word_num++;
-			}
+				char tmp = buff[i];
 
-			sudo2.solve_Que(0);
+				if (tmp >= '0'&& tmp <= '9')   //将数字存入solve_map中
+				{
+					if (t == 81)	//每存入81个数字即存入1一个数独问题
+					{
+						t = 0;
+						que_num++;
+					}
+
+					solve_map[que_num][t] = tmp - '0';
+					t++;
+				}
+			}
 		}
 
-		fi.close();
+		for (int i = 0; i < que_num; i++) 
+		sudo2.solve_Que(0,i);
 
 		sudo2.write_to_file();   //写入文件
 
