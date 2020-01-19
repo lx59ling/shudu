@@ -2,12 +2,15 @@
 #include<cstdlib>
 #include<iostream>
 #include <fstream>
+#include <string>
+#include <vector>
 
 #include"perm.h"
 
 using namespace std;
 
 int* result[1000005];   //用于存放指向 存放数独终局数据数组 的指针
+int solve_map[81][81];  //用于存放求解数独时的数独问题
 
 class sudo
 {
@@ -15,16 +18,21 @@ private:
 	int sudo_map[9][9];
 	int count;
 	int num;
+	bool solve;
 public:
 	sudo() {};
 	sudo(int n)
 	{
 		count = 0;
 		num = n;
+		solve = false;
+
 	}
 	void creat_End();
-	void solve_Que();
 	void write_to_file();
+	
+	void solve_Que(int count);
+	bool is_right(int count);
 };
 
 void sudo::creat_End()
@@ -67,7 +75,7 @@ void sudo::creat_End()
 
 					for (int i = 1; i < 9; i++)
 						for (int j = 0; j < 9; j++)
-							new_sudo_map[i * 9 + j] = this->sudo_map[row[i-1]][j];  //将数独终局存入一个一维数组中，方便输出
+							new_sudo_map[i * 9 + j] = this->sudo_map[row[i-1]][j];  //将数独终局存入一个一维数组中，方便存入数组result中
 
 					result[this->count] = new_sudo_map;
 					this->count++;
@@ -86,9 +94,96 @@ void sudo::creat_End()
 	return ;
 }
 
-void sudo::solve_Que()
+
+bool sudo::is_right(int count)		//判断填入数据的合法性
 {
-	1;
+	int row = count / 9;	//当前空所在行
+	int col = count % 9;	//当前空所在列
+	int k;
+
+	for (k = 0; k < 9; k++)		//判断填入的数在该行是否出现过
+	{
+		if (solve_map[row][k] == solve_map[row][col] && k != col)
+		{
+			return false;
+		}
+	}
+	
+	for (k = 0; k < 9; k++)		//判断填入的数在该列是否出现过
+	{
+		if (solve_map[k][col] == solve_map[row][col] && k != row)
+		{
+			return false;
+		}
+	}
+	
+	//判断填入的数在3*3的块区内是否出现过
+	int part_row = row / 3 * 3;
+	int part_col = col / 3 * 3;
+	for (k = part_row; k < part_row + 3; k++)
+	{
+		for (int k = part_col; k < part_col + 3; k++)
+
+		{
+			if (solve_map[k][k] == solve_map[row][col] && k != row && k != col)
+			{
+				return false;
+			}
+		}
+	}
+
+	//满足条件的数即可填入
+	return true;
+}
+
+int op = 0;   //用于表示solv_map里是否有空格0，若无则置1表示数独问题解决完毕
+
+void sudo::solve_Que(int count)
+{
+	//如果81个数字均有合法的填入，说明数独问题解决完毕，打印结果至文件
+	if (count == 81 && op ==1)
+	{
+		int* new_sudo_map = (int *)malloc(81 * sizeof(int));
+
+		for (int i = 0; i < 9; i++)
+			for (int j = 0; j < 9; j++)
+				new_sudo_map[i * 9 + j] = solve_map[i][j];  //将解得的数独终局存入一个一维数组中，方便存入数组result中
+
+		result[this->num] = new_sudo_map;
+		this->num++;    
+
+		return;
+	}
+
+	int row = count / 9;	//当前空所在行
+	int col = count % 9;	//当前空所在列
+
+	//如果该位置为0，即需要进行求解
+	if (solve_map[row][col] == 0)
+	{
+		op = 0;
+		for (int i = 1; i <= 9; i++)
+		{
+			solve_map[row][col] = i;	//将1-9填入该空位
+
+			if (is_right(count))	 //判断该数是否合法
+			{
+				op = 1;
+				solve_Que(count + 1);	//如果合法，则对下一个0位置进行操作
+			}
+		}
+
+		//如果该位置始终没找到合适的数字，或者dfs到某一层没有找到一个合适的数字，则重新置0等待回溯
+		solve_map[row][col] = 0;
+		op = 0;
+	}
+
+	//如果该位置不为0，则直接对下个位置进行操作
+	else
+	{
+		solve_Que(count + 1);
+	}
+
 }
 
 void sudo::write_to_file()
@@ -128,7 +223,14 @@ void sudo::write_to_file()
 
 int main(int argc, char const *argv[])
 {
+	/*		//测试用例
+	sudo sudo1(100000);
 
+	sudo1.creat_End();
+	sudo1.write_to_file();
+
+	return 0;
+	*/
 	
 	if (argc != 3 ) //未按照标准格式输入 
 	{
@@ -164,21 +266,46 @@ int main(int argc, char const *argv[])
 
 	if (strcmp(argv[1], "-s") == 0)  //-s求解数独问题
 	{
-		sudo sudo2;
 
-		sudo2.solve_Que();
+		ifstream fi;
+		fi.open(argv[2]);
+		
+		if (!fi)
+		{
+			cout << "打开文件失败" << endl;
+			return 0;
+		}
+
+		sudo sudo2;
+		int t1;
+		int*p = &solve_map[0][0];
+
+		int n;
+		fi >> n;   // 
+
+		for (int i = 0; i < n; i++)
+		{
+			p = &solve_map[0][0];   //每一个数独问题都从头开始赋值给solve_map
+			int word_num = 0;
+
+			while ((fi >> t1) &&(word_num < 81) )             //每次读取文件中的一个数独问题(每81个数字结束循环)
+			{
+				*p = t1;
+				p++;
+				word_num++;
+			}
+
+			sudo2.solve_Que(0);
+		}
+
+		fi.close();
+
+		sudo2.write_to_file();   //写入文件
+
+		
 	}
 
-	/*
 
-	sudo sudo1(10);
 
-	sudo1.creat_End();
-	sudo1.write_to_file();
-
-	
-
-	return 0;
-	*/
 
 }
